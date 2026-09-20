@@ -110,6 +110,7 @@ struct ContentView: View {
     }
 }
 
+#if DEBUG
 #Preview("Inicio") {
     ContentView()
         .environmentObject(AppViewModel())
@@ -121,3 +122,4 @@ struct ContentView: View {
         .environmentObject(AppViewModel.preview(state: .reviewing))
         .frame(width: 980, height: 680)
 }
+#endif

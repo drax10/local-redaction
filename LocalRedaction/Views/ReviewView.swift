@@ -114,8 +114,10 @@ struct ReviewView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ReviewView()
         .environmentObject(AppViewModel.preview(state: .reviewing))
         .frame(width: 980, height: 680)
 }
+#endif

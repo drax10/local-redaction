@@ -58,8 +58,10 @@ struct ProcessingView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ProcessingView()
         .environmentObject(AppViewModel.preview(state: .processing))
         .frame(width: 980, height: 680)
 }
+#endif

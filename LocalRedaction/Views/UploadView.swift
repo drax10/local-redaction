@@ -30,8 +30,10 @@ struct UploadView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     UploadView()
         .environmentObject(AppViewModel())
         .frame(width: 980, height: 680)
 }
+#endif

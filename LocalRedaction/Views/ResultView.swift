@@ -14,8 +14,10 @@ struct ResultView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ResultView()
         .environmentObject(AppViewModel.preview(state: .completed))
         .frame(width: 980, height: 680)
 }
+#endif
