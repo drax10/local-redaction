@@ -6,22 +6,26 @@ A native Mac app that redacts personal data from Mexican legal documents. Analys
 
 ## Install
 
-[**Download for Mac**](https://github.com/drax10/local-redaction/releases/latest/download/RedaccionLocal.zip)
+Apple will not let a downloaded `.app` open with a double-click unless it is signed and notarized with a paid Developer ID. There is no free way around that Finder warning.
 
-1. Unzip the download.
-2. Drag **LocalRedaction** (Finder may show **Redacción Local**) into `/Applications`.
-3. Double-click the app. macOS 15 and later will block it with *Apple could not verify “LocalRedaction.app” is free of malware*. Click **Done**. Control-click → Open no longer bypasses this.
-4. Open **System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway** next to the message that the app was blocked.
-5. Confirm **Open Anyway** again and authenticate. After that, double-click works normally.
+The free option is to install from Terminal. That removes the quarantine flag macOS attaches to GitHub downloads, which is what triggers the malware dialog:
 
-If **Open Anyway** never appears, clear the download quarantine in Terminal, then open the app again:
+```bash
+curl -fsSL https://raw.githubusercontent.com/drax10/local-redaction/main/install.sh | sh
+```
+
+That puts **LocalRedaction** in `/Applications` and opens it. Run it once; afterward, double-click works.
+
+If you already downloaded the zip and dragged the app to Applications, only the quarantine step is needed:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/LocalRedaction.app
 open /Applications/LocalRedaction.app
 ```
 
-Apple Silicon and Intel Macs are both supported. A one-click install without these steps needs an Apple Developer ID and notarization. If the latest release is missing, use [Releases](https://github.com/drax10/local-redaction/releases) or build from source below.
+Building from source on the same Mac (below) also avoids the warning, because Gatekeeper only treats internet downloads this way.
+
+[Zip download](https://github.com/drax10/local-redaction/releases/latest/download/RedaccionLocal.zip) if you prefer to install by hand: unzip, drag to Applications, then run the `xattr` command above. **System Settings → Privacy & Security → Open Anyway** is Apple’s GUI equivalent; Control-click → Open no longer works on macOS 15+.
 
 ## Use
 
