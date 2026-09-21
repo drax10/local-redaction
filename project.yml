@@ -31,6 +31,7 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDevelopmentRegion: es
         INFOPLIST_KEY_CFBundleDisplayName: Redacción Local
         INFOPLIST_KEY_CFBundleName: Redacción Local
