@@ -9,10 +9,19 @@ A native Mac app that redacts personal data from Mexican legal documents. Analys
 [**Download for Mac**](https://github.com/drax10/local-redaction/releases/latest/download/RedaccionLocal.zip)
 
 1. Unzip the download.
-2. Drag **Redacción Local** into `/Applications`.
-3. The first time, Control-click the app and choose **Open**. macOS will warn that the build is not notarized; confirm Open.
+2. Drag **LocalRedaction** (Finder may show **Redacción Local**) into `/Applications`.
+3. Double-click the app. macOS 15 and later will block it with *Apple could not verify “LocalRedaction.app” is free of malware*. Click **Done**. Control-click → Open no longer bypasses this.
+4. Open **System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway** next to the message that the app was blocked.
+5. Confirm **Open Anyway** again and authenticate. After that, double-click works normally.
 
-Apple Silicon and Intel Macs are both supported. If the latest release is missing, use [Releases](https://github.com/drax10/local-redaction/releases) or build from source below.
+If **Open Anyway** never appears, clear the download quarantine in Terminal, then open the app again:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/LocalRedaction.app
+open /Applications/LocalRedaction.app
+```
+
+Apple Silicon and Intel Macs are both supported. A one-click install without these steps needs an Apple Developer ID and notarization. If the latest release is missing, use [Releases](https://github.com/drax10/local-redaction/releases) or build from source below.
 
 ## Use
 
