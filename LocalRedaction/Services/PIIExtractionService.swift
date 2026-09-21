@@ -78,9 +78,7 @@ final class PIIExtractionService: Sendable {
             let exact = match.text
             let normalized = TextSpanLocator.normalized(exact)
             guard normalized.count >= 2 else { continue }
-            if match.type == .name, !PersonalNameFilter.shouldKeep(exact) {
-                continue
-            }
+            guard PIICandidateFilter.shouldKeep(exact, as: match.type) else { continue }
 
             let key = "\(match.type.rawValue)|\(normalized)"
             guard seen.insert(key).inserted else { continue }

@@ -22,6 +22,7 @@ final class RegexExtractionService: Sendable {
                 guard !value.isEmpty else { continue }
 
                 let extracted = ExtractedMatch(text: value, type: type, nsRange: chosen)
+                guard PIICandidateFilter.shouldKeep(value, as: type) else { continue }
                 if accepted.contains(where: { Self.rangesOverlap($0.nsRange, extracted.nsRange) }) {
                     continue
                 }
@@ -114,11 +115,6 @@ final class RegexExtractionService: Sendable {
             (
                 .organization,
                 #"\bmarca\s+([A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑ0-9\-]+)"#,
-                [.caseInsensitive]
-            ),
-            (
-                .identifier,
-                #"\bmodelo\s+([A-Z0-9][A-Za-z0-9\-]+)"#,
                 [.caseInsensitive]
             ),
             (
