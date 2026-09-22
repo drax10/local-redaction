@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReviewView: View {
     @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.documentDropTargeted) private var isDropTargeted
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,6 +12,12 @@ struct ReviewView: View {
             }
             statusBar
         }
+        .onDrop(
+            of: [.fileURL],
+            delegate: DocumentDropDelegate(isTargeted: isDropTargeted) { url in
+                viewModel.process(url: url)
+            }
+        )
     }
 
     private var previewPane: some View {
@@ -25,6 +32,9 @@ struct ReviewView: View {
                 },
                 onRedact: { snippet in
                     viewModel.addRedaction(fromSelectedText: snippet)
+                },
+                onOpenFile: { url in
+                    viewModel.process(url: url)
                 }
             )
         }
@@ -63,7 +73,7 @@ struct ReviewView: View {
                     }
 
                     TableColumn("Etiqueta") { $candidate in
-                        Text(viewModel.tag(for: candidate))
+                        Text(viewModel.tagsByID[candidate.id] ?? viewModel.tag(for: candidate))
                             .font(.body.monospaced())
                             .foregroundStyle(candidate.isSelected ? Color.primary : Color.secondary)
                     }

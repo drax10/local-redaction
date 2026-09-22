@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProcessingView: View {
     @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.documentDropTargeted) private var isDropTargeted
 
     var body: some View {
         VStack(spacing: 20) {
@@ -24,7 +25,7 @@ struct ProcessingView: View {
                 .frame(width: 280)
 
             VStack(alignment: .leading, spacing: 8) {
-                stepRow("Leyendo el documento", done: viewModel.processingProgress > 0.08)
+                stepRow("Leyendo el documento", done: viewModel.processingProgress > 0.16)
                 stepRow("Identificadores RFC, CURP, CLABE y cédula", done: viewModel.processingProgress >= 0.45)
                 stepRow("Nombres, empresas, domicilios y otros datos", done: viewModel.processingProgress >= 0.88)
                 stepRow("Preparando resultados", done: viewModel.processingProgress >= 1)
@@ -44,6 +45,12 @@ struct ProcessingView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.processingProgress)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Procesando. \(viewModel.processingStatus)")
+        .onDrop(
+            of: [.fileURL],
+            delegate: DocumentDropDelegate(isTargeted: isDropTargeted) { url in
+                viewModel.process(url: url)
+            }
+        )
     }
 
     private func stepRow(_ title: String, done: Bool) -> some View {

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-enum PIIType: String, CaseIterable, Identifiable, Hashable, Sendable {
+enum PIIType: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
     case rfc
     case curp
     case clabe

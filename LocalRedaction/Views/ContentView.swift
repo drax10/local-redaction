@@ -1,58 +1,89 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: AppViewModel
+    @State private var isDropTargeted = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                switch viewModel.state {
-                case .upload:
-                    UploadView()
-                case .processing:
-                    ProcessingView()
-                case .reviewing, .completed:
-                    ReviewView()
+        NavigationSplitView(columnVisibility: $viewModel.columnVisibility) {
+            DocumentSidebarView(isDropTargeted: $isDropTargeted)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 360)
+        } detail: {
+            NavigationStack {
+                detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .navigationTitle(viewModel.navigationTitle)
+                    .toolbar { toolbarContent }
+            }
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(
+            of: [.fileURL],
+            delegate: DocumentDropDelegate(isTargeted: $isDropTargeted) { url in
+                viewModel.process(url: url)
+            }
+        )
+        .environment(\.documentDropTargeted, $isDropTargeted)
+        .fileImporter(
+            isPresented: $viewModel.isImporterPresented,
+            allowedContentTypes: DocumentTextExtractor.allowedContentTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    viewModel.process(url: url)
                 }
+            case .failure(let error):
+                viewModel.errorMessage = error.localizedDescription
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .navigationTitle(viewModel.navigationTitle)
-            .toolbar { toolbarContent }
-            .fileImporter(
-                isPresented: $viewModel.isImporterPresented,
-                allowedContentTypes: [.pdf, .plainText, .utf8PlainText],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        viewModel.process(url: url)
-                    }
-                case .failure(let error):
-                    viewModel.errorMessage = error.localizedDescription
-                }
+        }
+        .alert("No se pudo abrir el documento", isPresented: errorBinding) {
+            Button("Aceptar", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            "Este documento ya está analizado",
+            isPresented: duplicatePromptBinding,
+            titleVisibility: .visible
+        ) {
+            Button("Abrir el existente") {
+                viewModel.openExistingInsteadOfRescan()
             }
-            .alert("No se pudo abrir el documento", isPresented: errorBinding) {
-                Button("Aceptar", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage ?? "")
+            Button("Volver a analizar") {
+                viewModel.rescanExistingDocument()
             }
+            Button("Cancelar", role: .cancel) {
+                viewModel.dismissDuplicatePrompt()
+            }
+        } message: {
+            Text(duplicatePromptMessage)
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch viewModel.state {
+        case .upload:
+            UploadView()
+        case .processing:
+            ProcessingView()
+        case .reviewing, .completed:
+            ReviewView()
         }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if !viewModel.sourceFileName.isEmpty, viewModel.state != .upload {
-            ToolbarItem(placement: .navigation) {
-                Label(viewModel.sourceFileName, systemImage: "doc")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.secondary)
-                    .help(viewModel.sourceFileName)
-            }
-        }
-
         switch viewModel.state {
         case .upload:
             ToolbarItem(placement: .primaryAction) {
@@ -64,7 +95,7 @@ struct ContentView: View {
         case .processing:
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancelar") {
-                    viewModel.startOver()
+                    viewModel.cancelProcessing()
                 }
                 .help("Cancelar el análisis")
             }
@@ -78,11 +109,11 @@ struct ContentView: View {
         case .reviewing, .completed:
             ToolbarItem(placement: .automatic) {
                 Button {
-                    viewModel.startOver()
+                    viewModel.showDropZone()
                 } label: {
-                    Label("Empezar de nuevo", systemImage: "arrow.counterclockwise")
+                    Label("Nuevo documento", systemImage: "plus")
                 }
-                .help("Empezar de nuevo")
+                .help("Abrir otro archivo")
                 .labelStyle(.iconOnly)
             }
 
@@ -107,6 +138,20 @@ struct ContentView: View {
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }
         )
+    }
+
+    private var duplicatePromptBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.duplicatePrompt != nil },
+            set: { if !$0 { viewModel.dismissDuplicatePrompt() } }
+        )
+    }
+
+    private var duplicatePromptMessage: String {
+        guard let name = viewModel.duplicatePrompt?.existing.fileName else {
+            return "Este archivo ya está en el historial."
+        }
+        return "«\(name)» ya está en el historial con su texto y tachaduras. ¿Quieres abrirlo o analizarlo de nuevo?"
     }
 }
 

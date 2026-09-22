@@ -4,15 +4,22 @@ import SwiftUI
 struct LocalRedactionApp: App {
     @StateObject private var viewModel = AppViewModel()
 
+    init() {
+        ScanNotificationService.shared.installDelegate()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
-                .frame(minWidth: 780, minHeight: 520)
+                .frame(minWidth: 920, minHeight: 520)
+                .onOpenURL { url in
+                    viewModel.process(url: url)
+                }
         }
         .windowToolbarStyle(.unified)
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 980, height: 680)
+        .defaultSize(width: 1100, height: 700)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Abrir…") {
@@ -21,8 +28,8 @@ struct LocalRedactionApp: App {
                 .keyboardShortcut("o")
                 .disabled(!viewModel.canOpenDocument)
 
-                Button("Empezar de nuevo") {
-                    viewModel.startOver()
+                Button("Nuevo documento") {
+                    viewModel.showDropZone()
                 }
                 .keyboardShortcut("n")
                 .disabled(!viewModel.canStartOver)

@@ -29,7 +29,7 @@ Building from source on the same Mac (below) also avoids the warning, because Ga
 
 ## Use
 
-1. Drop in a PDF or `.txt` file (the PDF must contain real text, not only a scan).
+1. Drop in a PDF, Word (`.doc` / `.docx`), or `.txt` file. Scanned PDFs are read with on-device OCR; nothing is uploaded.
 2. Review the findings table. Click a row to jump to it in the document.
 3. Change types or uncheck anything that should stay visible.
 4. Copy the tagged text and paste it into another AI. The same person stays `[NOMBRE 1]` throughout, so you can still ask about that party without sending the real name.
@@ -55,4 +55,5 @@ xcodegen generate
 
 - App Sandbox; the app only reads files you choose.
 - Regex plus on-device Foundation Models (Apple Intelligence) when available, with NLTagger as fallback.
+- Scanned PDFs use Apple Vision OCR on the device.
 - No network calls for extraction.

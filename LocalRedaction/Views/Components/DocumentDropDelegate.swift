@@ -1,12 +1,23 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct DocumentDropTargetedKey: EnvironmentKey {
+    static let defaultValue: Binding<Bool> = .constant(false)
+}
+
+extension EnvironmentValues {
+    var documentDropTargeted: Binding<Bool> {
+        get { self[DocumentDropTargetedKey.self] }
+        set { self[DocumentDropTargetedKey.self] = newValue }
+    }
+}
+
 struct DocumentDropDelegate: DropDelegate {
     @Binding var isTargeted: Bool
     let onDrop: (URL) -> Void
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [.fileURL, .pdf, .plainText])
+        info.hasItemsConforming(to: [.fileURL] + DocumentTextExtractor.allowedContentTypes)
     }
 
     func dropEntered(info: DropInfo) {

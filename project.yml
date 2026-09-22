@@ -28,9 +28,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tapachtli.LocalRedaction
         PRODUCT_NAME: LocalRedaction
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.1.0"
+        CURRENT_PROJECT_VERSION: "2"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: LocalRedaction/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDevelopmentRegion: es
         INFOPLIST_KEY_CFBundleDisplayName: Redacción Local

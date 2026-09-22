@@ -24,46 +24,16 @@ enum RedactionEngine {
     /// line breaks inside a span are treated as interchangeable so a wrapped
     /// address still redacts.
     static func redact(text: String, candidates: [RedactionCandidate]) -> String {
-        let tags = numberedTags(for: candidates)
-        let selected = candidates.filter(\.isSelected)
-
-        var replacements: [(original: String, tag: String)] = []
-        var seen = Set<String>()
-        for candidate in selected {
-            let key = TextSpanLocator.normalized(candidate.originalText)
-            guard seen.insert("\(candidate.type.rawValue)|\(key)").inserted else { continue }
-            guard let tag = tags[candidate.id] else { continue }
-            replacements.append((candidate.originalText, tag))
-        }
-
-        replacements.sort { $0.original.count > $1.original.count }
-
-        for candidate in selected where candidate.type == .address {
-            if let core = streetNumberCore(from: candidate.originalText),
-               let tag = tags[candidate.id] {
-                let key = TextSpanLocator.normalized(core)
-                if seen.insert("address-core|\(key)").inserted {
-                    replacements.append((core, tag))
-                }
-            }
-        }
-
-        replacements.sort { $0.original.count > $1.original.count }
-
-        var output = text
-        for replacement in replacements {
-            let ranges = TextSpanLocator.nsRanges(of: replacement.original, in: output)
-            for range in ranges.reversed() {
-                let expanded = expandTrailingAddressDetails(range, in: output)
-                guard let stringRange = Range(expanded, in: output) else { continue }
-                output.replaceSubrange(stringRange, with: replacement.tag)
-            }
-        }
-        return output
+        var index = RedactionIndex()
+        index.synchronize(token: "ad-hoc", text: text, candidates: candidates)
+        return index.apply(
+            text: text,
+            tags: numberedTags(for: candidates),
+            selectedIDs: Set(candidates.filter(\.isSelected).map(\.id))
+        )
     }
 
-    /// "Calle X 105, Depto..., C.P. 06700" → "Calle X 105" so shorter repeats still redact.
-    private static func streetNumberCore(from address: String) -> String? {
+    fileprivate static func streetNumberCore(from address: String) -> String? {
         let normalized = TextSpanLocator.normalized(address)
         let pattern = #"(?i)(?:Calle|Avenida|Av\.|Boulevard|Blvd\.|Paseo|Calzada|Privada)\s+.+?\s+\d+[A-Za-z\-]?"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -78,7 +48,7 @@ enum RedactionEngine {
         return core.count >= 12 ? core : nil
     }
 
-    private static func expandTrailingAddressDetails(_ range: NSRange, in text: String) -> NSRange {
+    fileprivate static func expandTrailingAddressDetails(_ range: NSRange, in text: String) -> NSRange {
         let pattern = #"(?:,?\s*(?:C\.?P\.?\s*\d{5}|C[oó]digo\s+Postal\s*\d{5}|Col(?:onia)?\.?\s+[^,.]{2,40}|Depto\.?\s*[\w\-]+|Despacho\s+\d+|Piso\s+\d+|Alcald[ií]a\s+[^,.]{2,40}|Ciudad de México|Estado de México))+"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
               let stringRange = Range(range, in: text) else {
@@ -91,5 +61,91 @@ enum RedactionEngine {
             return range
         }
         return NSRange(location: range.location, length: range.length + match.range.length)
+    }
+}
+
+/// Locates each candidate once in the source text. Toggling Incluir only reapplies
+/// those cached ranges — it does not scan the document again.
+struct RedactionIndex: Sendable {
+    private var token = ""
+    private var utf16Length = -1
+    private var spans: [Span] = []
+
+    private struct Span: Sendable {
+        var id: UUID
+        var type: PIIType
+        var ranges: [NSRange]
+    }
+
+    mutating func synchronize(token: String, text: String, candidates: [RedactionCandidate]) {
+        let length = (text as NSString).length
+        if token != self.token || length != utf16Length {
+            self.token = token
+            utf16Length = length
+            spans = candidates.map { Self.makeSpan(for: $0, in: text) }
+            return
+        }
+
+        let existing = Dictionary(uniqueKeysWithValues: spans.map { ($0.id, $0) })
+        var next: [Span] = []
+        next.reserveCapacity(candidates.count)
+        for candidate in candidates {
+            if let span = existing[candidate.id], span.type == candidate.type {
+                next.append(span)
+            } else {
+                next.append(Self.makeSpan(for: candidate, in: text))
+            }
+        }
+        spans = next
+    }
+
+    func apply(text: String, tags: [UUID: String], selectedIDs: Set<UUID>) -> String {
+        let nsText = text as NSString
+        var replacements: [(NSRange, String)] = []
+        for span in spans where selectedIDs.contains(span.id) {
+            guard let tag = tags[span.id] else { continue }
+            for range in span.ranges where range.location + range.length <= nsText.length {
+                replacements.append((range, tag))
+            }
+        }
+
+        replacements.sort { lhs, rhs in
+            if lhs.0.location == rhs.0.location {
+                return lhs.0.length > rhs.0.length
+            }
+            return lhs.0.location < rhs.0.location
+        }
+
+        let output = NSMutableString(capacity: nsText.length)
+        var cursor = 0
+        for (range, tag) in replacements {
+            if range.location < cursor { continue }
+            if range.location > cursor {
+                output.append(nsText.substring(with: NSRange(location: cursor, length: range.location - cursor)))
+            }
+            output.append(tag)
+            cursor = range.location + range.length
+        }
+        if cursor < nsText.length {
+            output.append(nsText.substring(from: cursor))
+        }
+        return output as String
+    }
+
+    private static func makeSpan(for candidate: RedactionCandidate, in text: String) -> Span {
+        var ranges = TextSpanLocator.nsRanges(of: candidate.originalText, in: text)
+        if candidate.type == .address {
+            ranges = ranges.map { RedactionEngine.expandTrailingAddressDetails($0, in: text) }
+            if let core = RedactionEngine.streetNumberCore(from: candidate.originalText) {
+                for coreRange in TextSpanLocator.nsRanges(of: core, in: text) {
+                    let covered = ranges.contains { NSIntersectionRange($0, coreRange).length == coreRange.length }
+                    if !covered {
+                        ranges.append(RedactionEngine.expandTrailingAddressDetails(coreRange, in: text))
+                    }
+                }
+            }
+        }
+        ranges.sort { $0.location < $1.location }
+        return Span(id: candidate.id, type: candidate.type, ranges: ranges)
     }
 }

@@ -7,9 +7,10 @@ struct RedactedPreviewTextView: NSViewRepresentable {
     var highlightPulse: Int
     var onSelectionChange: (String) -> Void
     var onRedact: (String) -> Void
+    var onOpenFile: (URL) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onSelectionChange: onSelectionChange, onRedact: onRedact)
+        Coordinator(onSelectionChange: onSelectionChange, onRedact: onRedact, onOpenFile: onOpenFile)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -30,10 +31,13 @@ struct RedactedPreviewTextView: NSViewRepresentable {
         preview.isSelectable = true
         preview.isRichText = false
         preview.usesFindBar = true
+        preview.layoutManager?.allowsNonContiguousLayout = true
         preview.textContainerInset = NSSize(width: 12, height: 12)
         preview.delegate = context.coordinator
         preview.onSelectionChange = context.coordinator.onSelectionChange
         preview.onRedact = context.coordinator.onRedact
+        preview.onOpenFile = context.coordinator.onOpenFile
+        preview.registerForDraggedTypes([.fileURL])
         preview.string = text
 
         let scrollView = NSScrollView()
@@ -49,10 +53,12 @@ struct RedactedPreviewTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.onSelectionChange = onSelectionChange
         context.coordinator.onRedact = onRedact
+        context.coordinator.onOpenFile = onOpenFile
 
         guard let textView = scrollView.documentView as? PreviewTextView else { return }
         textView.onSelectionChange = onSelectionChange
         textView.onRedact = onRedact
+        textView.onOpenFile = onOpenFile
 
         let textChanged = textView.string != text
         if textChanged {
@@ -64,20 +70,31 @@ struct RedactedPreviewTextView: NSViewRepresentable {
 
         let shouldPulse = context.coordinator.lastHighlightPulse != highlightPulse
         context.coordinator.lastHighlightPulse = highlightPulse
-        textView.highlightOccurrences(
-            of: highlightNeedle,
-            pulse: shouldPulse && !highlightNeedle.isEmpty
-        )
+        let needleChanged = context.coordinator.lastHighlightNeedle != highlightNeedle
+        context.coordinator.lastHighlightNeedle = highlightNeedle
+        if textChanged || needleChanged || shouldPulse {
+            textView.highlightOccurrences(
+                of: highlightNeedle,
+                pulse: shouldPulse && !highlightNeedle.isEmpty
+            )
+        }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var onSelectionChange: (String) -> Void
         var onRedact: (String) -> Void
+        var onOpenFile: (URL) -> Void
         var lastHighlightPulse = -1
+        var lastHighlightNeedle = ""
 
-        init(onSelectionChange: @escaping (String) -> Void, onRedact: @escaping (String) -> Void) {
+        init(
+            onSelectionChange: @escaping (String) -> Void,
+            onRedact: @escaping (String) -> Void,
+            onOpenFile: @escaping (URL) -> Void
+        ) {
             self.onSelectionChange = onSelectionChange
             self.onRedact = onRedact
+            self.onOpenFile = onOpenFile
         }
     }
 }
@@ -85,6 +102,7 @@ struct RedactedPreviewTextView: NSViewRepresentable {
 final class PreviewTextView: NSTextView {
     var onSelectionChange: ((String) -> Void)?
     var onRedact: ((String) -> Void)?
+    var onOpenFile: ((URL) -> Void)?
 
     private var callout: NSHostingView<RedactCallout>?
 
@@ -186,6 +204,32 @@ final class PreviewTextView: NSTextView {
         let origin = NSPoint(x: 0, y: min(max(0, centeredY), maxY))
         scrollView.contentView.scroll(to: origin)
         scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        fileURL(from: sender) != nil ? .copy : []
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        draggingEntered(sender)
+    }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        fileURL(from: sender) != nil
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let url = fileURL(from: sender) else { return false }
+        onOpenFile?(url)
+        return true
+    }
+
+    private func fileURL(from sender: NSDraggingInfo) -> URL? {
+        let urls = sender.draggingPasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL]
+        return urls?.first(where: DocumentTextExtractor.isSupported(url:))
     }
 
     private func refreshSelectionUI() {

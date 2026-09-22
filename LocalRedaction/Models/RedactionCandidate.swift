@@ -1,6 +1,6 @@
 import Foundation
 
-struct RedactionCandidate: Identifiable, Hashable, Sendable {
+struct RedactionCandidate: Identifiable, Hashable, Sendable, Codable {
     let id: UUID
     let originalText: String
     var type: PIIType
